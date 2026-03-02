@@ -1,0 +1,15 @@
+-- public.view_login_logout source
+
+CREATE OR REPLACE VIEW public.view_login_logout
+AS SELECT DISTINCT (ull.log_time AT TIME ZONE 'Asia/Kolkata'::text)::date AS login_date,
+    ull.user_id,
+    mu.full_name AS rm_name,
+    ml.name AS location,
+    (array_agg(to_char((ull.log_time AT TIME ZONE 'Asia/Kolkata'::text), 'dd-MM-yyyy HH12:MI AM'::text) ORDER BY ull.user_login_id))[1] AS login_time,
+    (array_agg(to_char((ull.log_time AT TIME ZONE 'Asia/Kolkata'::text), 'dd-MM-yyyy HH12:MI AM'::text) ORDER BY ull.user_login_id DESC))[1] AS logout_time
+   FROM user_login_log ull
+     LEFT JOIN mst_user mu ON ull.user_id = mu.user_id
+     LEFT JOIN mst_location ml ON mu.location_id = ml.location_id
+  WHERE EXTRACT(hour FROM ull.log_time) >= 6::numeric AND EXTRACT(hour FROM ull.log_time) < 23::numeric
+  GROUP BY ((ull.log_time AT TIME ZONE 'Asia/Kolkata'::text)::date), ull.user_id, ml.name, mu.full_name
+  ORDER BY mu.full_name, ((ull.log_time AT TIME ZONE 'Asia/Kolkata'::text)::date);
