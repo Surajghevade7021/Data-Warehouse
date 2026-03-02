@@ -1,0 +1,57 @@
+-- public.view_first_last_activity source
+
+CREATE OR REPLACE VIEW public.view_first_last_activity
+AS WITH activity_ranked AS (
+         SELECT a_1.created_by,
+            a_1.created_at::date AS activity_date,
+            a_1.activity_id,
+            a_1.created_at,
+            row_number() OVER (PARTITION BY a_1.created_by, (a_1.created_at::date) ORDER BY a_1.created_at) AS first_rank,
+            row_number() OVER (PARTITION BY a_1.created_by, (a_1.created_at::date) ORDER BY a_1.created_at DESC) AS last_rank
+           FROM activity a_1
+          WHERE a_1.created_at::date >= '2024-11-01'::date AND a_1.created_at::date <= '2025-01-31'::date AND EXTRACT(hour FROM a_1.created_at) >= 6::numeric AND EXTRACT(hour FROM a_1.created_at) < 23::numeric
+        )
+ SELECT mu.full_name,
+    a.created_by AS user_id,
+    min(
+        CASE
+            WHEN a.first_rank = 1 THEN (a.created_at AT TIME ZONE 'Asia/Kolkata'::text)::date
+            ELSE NULL::date
+        END) AS date,
+    min(
+        CASE
+            WHEN a.first_rank = 1 THEN to_char((a.created_at AT TIME ZONE 'Asia/Kolkata'::text), 'dd-MM-yyyy HH12:MI AM'::text)
+            ELSE NULL::text
+        END) AS first_activity_time,
+    min(
+        CASE
+            WHEN a.last_rank = 1 THEN to_char((a.created_at AT TIME ZONE 'Asia/Kolkata'::text), 'dd-MM-yyyy HH12:MI AM'::text)
+            ELSE NULL::text
+        END) AS last_activity_time,
+    min(
+        CASE
+            WHEN a.first_rank = 1 THEN a.activity_id
+            ELSE NULL::integer
+        END) AS first_activity_id,
+    min(
+        CASE
+            WHEN a.last_rank = 1 THEN a.activity_id
+            ELSE NULL::integer
+        END) AS last_activity_id
+   FROM activity_ranked a
+     JOIN mst_user mu ON a.created_by = mu.user_id
+  WHERE mu.location_id = ANY (ARRAY[8, 9])
+  GROUP BY a.created_by, mu.full_name, a.activity_date
+  ORDER BY mu.full_name, (min(
+        CASE
+            WHEN a.first_rank = 1 THEN (a.created_at AT TIME ZONE 'Asia/Kolkata'::text)::date
+            ELSE NULL::date
+        END)), (min(
+        CASE
+            WHEN a.first_rank = 1 THEN to_char((a.created_at AT TIME ZONE 'Asia/Kolkata'::text), 'dd-MM-yyyy HH12:MI AM'::text)
+            ELSE NULL::text
+        END)), (min(
+        CASE
+            WHEN a.last_rank = 1 THEN to_char((a.created_at AT TIME ZONE 'Asia/Kolkata'::text), 'dd-MM-yyyy HH12:MI AM'::text)
+            ELSE NULL::text
+        END));
